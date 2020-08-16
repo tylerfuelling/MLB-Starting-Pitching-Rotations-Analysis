@@ -1,0 +1,25 @@
+---
+title: "mlb_sp_clustering"
+author: "Tyler Fuelling"
+date: "August 16, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load libraries
+library(VIM)
+```
+
+```{r}
+# read the data into a dataframe
+df <- read.csv("sp_data.csv", header = TRUE, check.names = FALSE)
+colnames(df)[1] <- "Name"
+head(df)
+```
+``` {r}
+aggr(df)
+
+
+```

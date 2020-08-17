@@ -120,16 +120,16 @@ set.seed(123) # set seed
 # k-means clustering with k = 3
 clusters <- kmeans(cluster_df[, 4:44], 3, nstart = 25)
 
-# add each player's cluster to the dataframe
-cluster_df$cluster <- as.factor(clusters$cluster)
-cluster_df <- cluster_df[c(1, 2, 3, 45, 4:44)]
+# add each player's cluster to the original dataframe
+df$cluster <- as.factor(clusters$cluster)
+df <-df[c(1, 2, 3, 48, 4:47)]
 ```
 
 ``` {r}
 # creating a seperate dataframe for each of the three clusters
-cluster1 <- subset(cluster_df, cluster == "1")
-cluster2 <- subset(cluster_df, cluster == "2")
-cluster3 <- subset(cluster_df, cluster == "3")
+cluster1 <- subset(df, cluster == "1")
+cluster2 <- subset(df, cluster == "2")
+cluster3 <- subset(df, cluster == "3")
 
 # calculating the means of each numeric column in each cluster
 cluster1_avgs <- colMeans(cluster1[sapply(cluster1, is.numeric)])

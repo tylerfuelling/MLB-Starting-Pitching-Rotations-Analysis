@@ -13,10 +13,14 @@ library(VIM)
 library(dplyr)
 library(mice)
 library(sjmisc)
+library(purrr)
+library(factoextra)
+library(cluster)
+library(sjmisc)
 ```
 
 ```{r}
-# read the data into a dataframe
+# read the data file into a dataframe
 df <- read.csv("sp_data.csv", header = TRUE, check.names = TRUE)
 head(df)
 ```
@@ -37,21 +41,101 @@ head(scaled.df)
 ```
 
 ``` {r}
+# examining the NA values present in the dataframe
 aggr(scaled.df, col=c('navyblue', 'yellow'), numbers = TRUE, sortVars = TRUE, labels = names(scaled.df), cex.axis = .7, gap = 3, ylab = c("Missing Data", "Pattern"))
 ```
 ``` {r}
+# removing the three columns related to knuckleballs from the dataframe - none of the starting pitchers had a knuckleball percentage above 0%
 scaled.df <- subset(scaled.df, select = -c(kn_percent, kn_velo, kn_standardized_runs))
-summary(scaled.df)
+# creating a new subset of the dataframe without the name, team, and player id columns to be used for multivariate imputation (MICE package)
 mice_subset <- subset(scaled.df, select = -c(name, team, player_id))
-head(mice_subset)
 
-imputed_data <- mice(mice_subset, m = 5, maxit = 50, method = 'pmm', seed = 123)
-merged_imputed_data <- merge_imputations(mice_subset, imputed_data)
-View(merged_imputed_data)
+# Multivariate Imputation via Chained Equations
+# creating 15 imputed data sets because the original data set contained about 15% NA's, max iterations of 50, using "predictive mean matching"
+imputed_data <- mice(mice_subset, m = 15, maxit = 50, method = 'pmm', seed = 123)
+
+# merging the 15 imputed data sets and appending the imputed data to the mice_subset dataframe
+mice_subset <- merge_imputations(mice_subset, imputed_data, mice_subset)
+# removing the columns containing NA's from the dataframe, these were replaced with the imputed data 
+mice_subset <- mice_subset[colSums(is.na(mice_subset)) == 0]
+
+# verify that there are no more NA's present in the dataframe 
+table(is.na(mice_subset))
 ```
+
+```{r}
+# make a copy of the dataframe that contains all of the numerical data, including all of the imputed data
+cluster_df <- data.frame(mice_subset)
+# add the name, team, and player_id columns from the original dataframe to this dataframe that contains all of the data
+cluster_df$name <- df$name
+cluster_df$team <- df$team
+cluster_df$player_id <- df$player_id
+
+# reorganizing the order of the columns of the dataframe
+cluster_df <- cluster_df[c(42, 43, 44, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 13, 27, 28, 29, 30, 31, 14, 32, 33, 34, 35, 36,
+                           15, 37, 38, 39, 40, 41)]
+```
+
 ``` {r}
-#complete_data <- complete(imputed_data, 1)
-#head(complete_data)
+# determining the optimal number of clusters to use for k-means clustering
 
+set.seed(123) # set the seed so that the clustering achieves the same result each time it is run
+possible_k_values <- 1:15 # we will be checking k values of 1 through 15
 
+# Elbow Method
+
+# function that returns the total within-cluster sum of squares for the result of k-means clustering with k clusters
+get_total_wss <- function(k) {
+  kmeans(cluster_df[, 4:44], k, nstart = 25)$tot.withinss
+}
+# calculate the total within-cluster sum of squares for k-means clustering with k values of 1 through 15
+total_wss_values <- map_dbl(possible_k_values, get_total_wss)
+
+plot(possible_k_values, total_wss_values, type = "b", frame = FALSE, xlab= "Number of Clusters - K",
+     ylab = "Total Within-Cluster Sum of Squares", main = "The Elbow Method")
+
+# Silhouette Analysis
+
+possible_k_values <- 2:15 # skip k value of 1 so we don't get an error when calculating average silhouettes
+
+# function that calculates the average silhouette for the result of k-means clustering with k clusters
+get_avg_silhouette <- function(k) {
+  clstrs <- kmeans(cluster_df[, 4:44], k, nstart = 25)
+  silhouettes <- silhouette(clstrs$cluster, dist(cluster_df[, 4:44]))
+  mean(silhouettes[, "sil_width"])
+}
+
+# calculate the average silhouette for k-means clustering with k values of 1 through 15
+avg_silhouette_values <- map_dbl(possible_k_values, get_avg_silhouette)
+
+plot(possible_k_values, avg_silhouette_values, type = "b", frame = FALSE, xlab= "Number of Clusters - K",
+     ylab = "Average Silhouette", main = "Silhouette Analysis")
+
+```
+
+``` {r}
+# based on the Elbow Method and Silhouette Analysis, we will choose 3 as our value of k for k-means clustering
+set.seed(123) # set seed
+
+# k-means clustering with k = 3
+clusters <- kmeans(cluster_df[, 4:44], 3, nstart = 25)
+
+# add each player's cluster to the dataframe
+cluster_df$cluster <- as.factor(clusters$cluster)
+cluster_df <- cluster_df[c(1, 2, 3, 45, 4:44)]
+```
+
+``` {r}
+# creating a seperate dataframe for each of the three clusters
+cluster1 <- subset(cluster_df, cluster == "1")
+cluster2 <- subset(cluster_df, cluster == "2")
+cluster3 <- subset(cluster_df, cluster == "3")
+
+# calculating the means of each numeric column in each cluster
+cluster1_avgs <- colMeans(cluster1[sapply(cluster1, is.numeric)])
+cluster2_avgs <- colMeans(cluster2[sapply(cluster2, is.numeric)]) 
+cluster3_avgs <- colMeans(cluster3[sapply(cluster3, is.numeric)])
+
+# create a new dataframe of the averages
+cluster_avgs <- data.frame(cluster1_avgs, cluster2_avgs, cluster3_avgs)
 ```

@@ -10,16 +10,36 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # load libraries
 library(VIM)
+library(dplyr)
 ```
 
 ```{r}
 # read the data into a dataframe
-df <- read.csv("sp_data.csv", header = TRUE, check.names = FALSE)
-colnames(df)[1] <- "Name"
+df <- read.csv("sp_data.csv", header = TRUE, check.names = TRUE)
 head(df)
 ```
 ``` {r}
-aggr(df)
+# renaming the columns of the the df for easier use
+colnames(df)[1] <- "name"
+df <- df %>% rename(team = Team, ip = IP, k_percent = K., bb_percent = BB., babip = BABIP, gb_percent = GB., ld_percent = LD., fb_percent = FB.,iffb_percent = IFFB.,
+                    ev = EV, soft_percent = Soft., med_percent = Med., hard_percent = Hard., fa_percent = FB..1, sl_percent = SL., ct_percent = CT., cb_percent = CB.,
+                    ch_percent = CH., sf_percent = SF., kn_percent = KN., fa_standardized_runs = wFB.C, sl_standardized_runs = wSL.C, ct_standardized_runs = wCT.C,
+                    cb_standardized_runs = wCB.C, ch_standardized_runs = wCH.C, sf_standardized_runs = wSF.C, kn_standardized_runs = wKN.C, fa_velo = FBv, sl_velo = SLv,
+                    ct_velo = CTv, cb_velo = CBv, ch_velo = CHv, sf_velo = SFv, kn_velo = KNv, o_swing_percent = O.Swing., z_swing_percent = Z.Swing., swing_percent = Swing.,
+                    o_contact_percent = O.Contact., z_contact_percent = Z.Contact., contact_percent = Contact., zone_percent = Zone., first_strike_percent = F.Strike.,
+                    swinging_strike_percent = SwStr., lob_percent = LOB., pace = Pace, player_id = playerid)
+# standardizing the data so that it can be used for k-means clustering
+scaled.df <- data.frame(df)
+scaled.df[c(3:46)] <- scale(scaled.df[c(3:46)])
+head(scaled.df)
+```
+
+
+
+
+
+``` {r}
+#aggr(df)
 
 
 ```

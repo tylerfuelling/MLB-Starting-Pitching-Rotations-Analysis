@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 # load libraries
 library(VIM)
 library(dplyr)
+library(mice)
+library(sjmisc)
 ```
 
 ```{r}
@@ -34,12 +36,22 @@ scaled.df[c(3:46)] <- scale(scaled.df[c(3:46)])
 head(scaled.df)
 ```
 
-
-
-
-
 ``` {r}
-#aggr(df)
+aggr(scaled.df, col=c('navyblue', 'yellow'), numbers = TRUE, sortVars = TRUE, labels = names(scaled.df), cex.axis = .7, gap = 3, ylab = c("Missing Data", "Pattern"))
+```
+``` {r}
+scaled.df <- subset(scaled.df, select = -c(kn_percent, kn_velo, kn_standardized_runs))
+summary(scaled.df)
+mice_subset <- subset(scaled.df, select = -c(name, team, player_id))
+head(mice_subset)
+
+imputed_data <- mice(mice_subset, m = 5, maxit = 50, method = 'pmm', seed = 123)
+merged_imputed_data <- merge_imputations(mice_subset, imputed_data)
+View(merged_imputed_data)
+```
+``` {r}
+#complete_data <- complete(imputed_data, 1)
+#head(complete_data)
 
 
 ```

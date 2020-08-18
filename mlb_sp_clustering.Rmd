@@ -17,11 +17,12 @@ library(purrr)
 library(factoextra)
 library(cluster)
 library(sjmisc)
+library(miscTools)
 ```
 
 ```{r}
 # read the data file into a dataframe
-df <- read.csv("sp_data.csv", header = TRUE, check.names = TRUE)
+df <- read.csv("sp_data 2010-2019.csv", header = TRUE, check.names = TRUE)
 head(df)
 ```
 ``` {r}
@@ -41,8 +42,8 @@ df <- df %>% rename(team = Team, ip = IP, k_percent = K., bb_percent = BB., babi
 aggr(df, col=c('navyblue', 'yellow'), numbers = TRUE, sortVars = TRUE, labels = names(df), cex.axis = .7, gap = 3, ylab = c("Missing Data", "Pattern"))
 ```
 ``` {r}
-# removing the player id column, as well as the three columns related to knuckleballs from the dataframe - none of the starting pitchers had a knuckleball percentage above 0%
-df <- subset(df, select = -c(player_id, kn_percent, kn_velo, kn_standardized_runs))
+# removing the player id column - we don't need it
+df <- subset(df, select = -c(player_id))
 # creating a new subset of the dataframe without the name and team columns to be used for multivariate imputation (MICE package)
 mice_subset <- subset(df, select = -c(name, team))
 
@@ -67,8 +68,8 @@ imputed_df$name <- df$name
 imputed_df$team <- df$team
 
 # reorganizing the order of the columns of the dataframe
-imputed_df <- imputed_df[c(42, 43, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 13, 27, 28, 29, 30, 31, 14, 32, 33, 34, 35, 36,
-                           15, 37, 38, 39, 40, 41)]
+imputed_df <- imputed_df[c(42, 43, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 22, 23, 24, 25, 26, 12, 27, 28, 29, 30, 31, 13, 32, 33, 34, 35, 36,
+                           21, 37, 38, 39, 40, 41)]
 
 # standardizing the data so that it can be used for k-means clustering
 standardized_imputed_df <- data.frame(imputed_df)
@@ -114,7 +115,7 @@ plot(possible_k_values, avg_silhouette_values, type = "b", frame = FALSE, xlab= 
 ```
 
 ``` {r}
-# based on the Elbow Method and Silhouette Analysis, we will choose 3 as our value of k for k-means clustering
+# based on the Elbow Method and Silhouette Analysis, we will make an educated guess of 3 as our value of k for k-means clustering
 set.seed(123) # set seed
 
 # k-means clustering with k = 3
@@ -123,7 +124,7 @@ clusters <- kmeans(standardized_imputed_df[, 3:43], 3, nstart = 25)
 # add each player's cluster to the original dataframe and the imputed dataframe
 df$cluster <- as.factor(clusters$cluster)
 imputed_df$cluster <- as.factor(clusters$cluster)
-df <- df[c(1, 2, 44, 3:43)]
+df <- df[c(1, 2, 47, 3:46)]
 imputed_df <- imputed_df[c(1, 2, 44, 3:43)]
 ```
 
@@ -140,7 +141,13 @@ cluster3_imputed <- subset(imputed_df, cluster == "3")
 cluster1_avgs <- colMeans(cluster1_imputed[sapply(cluster1_imputed, is.numeric)])
 cluster2_avgs <- colMeans(cluster2_imputed[sapply(cluster2_imputed, is.numeric)]) 
 cluster3_avgs <- colMeans(cluster3_imputed[sapply(cluster3_imputed, is.numeric)])
+# calculating each cluster's medians for each attribute
+cluster1_meds <- colMedians(cluster1_imputed[sapply(cluster1_imputed, is.numeric)])
+cluster2_meds <- colMedians(cluster2_imputed[sapply(cluster2_imputed, is.numeric)]) 
+cluster3_meds <- colMedians(cluster3_imputed[sapply(cluster3_imputed, is.numeric)])
 
 # create a new dataframe of the per-cluster averages
 cluster_avgs <- data.frame(cluster1_avgs, cluster2_avgs, cluster3_avgs)
+# create a new dataframe of the per-cluster medians
+cluster_meds <- data.frame(cluster1_meds, cluster2_meds, cluster3_meds)
 ```

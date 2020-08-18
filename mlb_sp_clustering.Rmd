@@ -34,21 +34,17 @@ df <- df %>% rename(team = Team, ip = IP, k_percent = K., bb_percent = BB., babi
                     ct_velo = CTv, cb_velo = CBv, ch_velo = CHv, sf_velo = SFv, kn_velo = KNv, o_swing_percent = O.Swing., z_swing_percent = Z.Swing., swing_percent = Swing.,
                     o_contact_percent = O.Contact., z_contact_percent = Z.Contact., contact_percent = Contact., zone_percent = Zone., first_strike_percent = F.Strike.,
                     swinging_strike_percent = SwStr., lob_percent = LOB., pace = Pace, player_id = playerid)
-# standardizing the data so that it can be used for k-means clustering
-scaled.df <- data.frame(df)
-scaled.df[c(3:46)] <- scale(scaled.df[c(3:46)])
-head(scaled.df)
 ```
 
 ``` {r}
 # examining the NA values present in the dataframe
-aggr(scaled.df, col=c('navyblue', 'yellow'), numbers = TRUE, sortVars = TRUE, labels = names(scaled.df), cex.axis = .7, gap = 3, ylab = c("Missing Data", "Pattern"))
+aggr(df, col=c('navyblue', 'yellow'), numbers = TRUE, sortVars = TRUE, labels = names(df), cex.axis = .7, gap = 3, ylab = c("Missing Data", "Pattern"))
 ```
 ``` {r}
-# removing the three columns related to knuckleballs from the dataframe - none of the starting pitchers had a knuckleball percentage above 0%
-scaled.df <- subset(scaled.df, select = -c(kn_percent, kn_velo, kn_standardized_runs))
-# creating a new subset of the dataframe without the name, team, and player id columns to be used for multivariate imputation (MICE package)
-mice_subset <- subset(scaled.df, select = -c(name, team, player_id))
+# removing the player id column, as well as the three columns related to knuckleballs from the dataframe - none of the starting pitchers had a knuckleball percentage above 0%
+df <- subset(df, select = -c(player_id, kn_percent, kn_velo, kn_standardized_runs))
+# creating a new subset of the dataframe without the name and team columns to be used for multivariate imputation (MICE package)
+mice_subset <- subset(df, select = -c(name, team))
 
 # Multivariate Imputation via Chained Equations
 # creating 15 imputed data sets because the original data set contained about 15% NA's, max iterations of 50, using "predictive mean matching"
@@ -65,15 +61,19 @@ table(is.na(mice_subset))
 
 ```{r}
 # make a copy of the dataframe that contains all of the numerical data, including all of the imputed data
-cluster_df <- data.frame(mice_subset)
-# add the name, team, and player_id columns from the original dataframe to this dataframe that contains all of the data
-cluster_df$name <- df$name
-cluster_df$team <- df$team
-cluster_df$player_id <- df$player_id
+imputed_df <- data.frame(mice_subset)
+# add the name and team columns from the original dataframe to this dataframe that contains all of the data
+imputed_df$name <- df$name
+imputed_df$team <- df$team
 
 # reorganizing the order of the columns of the dataframe
-cluster_df <- cluster_df[c(42, 43, 44, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 13, 27, 28, 29, 30, 31, 14, 32, 33, 34, 35, 36,
+imputed_df <- imputed_df[c(42, 43, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 13, 27, 28, 29, 30, 31, 14, 32, 33, 34, 35, 36,
                            15, 37, 38, 39, 40, 41)]
+
+# standardizing the data so that it can be used for k-means clustering
+standardized_imputed_df <- data.frame(imputed_df)
+standardized_imputed_df[c(3:43)] <- scale(standardized_imputed_df[c(3:43)])
+head(standardized_imputed_df)
 ```
 
 ``` {r}
@@ -86,7 +86,7 @@ possible_k_values <- 1:15 # we will be checking k values of 1 through 15
 
 # function that returns the total within-cluster sum of squares for the result of k-means clustering with k clusters
 get_total_wss <- function(k) {
-  kmeans(cluster_df[, 4:44], k, nstart = 25)$tot.withinss
+  kmeans(standardized_imputed_df[, 3:43], k, nstart = 25)$tot.withinss
 }
 # calculate the total within-cluster sum of squares for k-means clustering with k values of 1 through 15
 total_wss_values <- map_dbl(possible_k_values, get_total_wss)
@@ -100,8 +100,8 @@ possible_k_values <- 2:15 # skip k value of 1 so we don't get an error when calc
 
 # function that calculates the average silhouette for the result of k-means clustering with k clusters
 get_avg_silhouette <- function(k) {
-  clstrs <- kmeans(cluster_df[, 4:44], k, nstart = 25)
-  silhouettes <- silhouette(clstrs$cluster, dist(cluster_df[, 4:44]))
+  clstrs <- kmeans(standardized_imputed_df[, 3:43], k, nstart = 25)
+  silhouettes <- silhouette(clstrs$cluster, dist(standardized_imputed_df[, 3:43]))
   mean(silhouettes[, "sil_width"])
 }
 
@@ -118,24 +118,29 @@ plot(possible_k_values, avg_silhouette_values, type = "b", frame = FALSE, xlab= 
 set.seed(123) # set seed
 
 # k-means clustering with k = 3
-clusters <- kmeans(cluster_df[, 4:44], 3, nstart = 25)
+clusters <- kmeans(standardized_imputed_df[, 3:43], 3, nstart = 25)
 
-# add each player's cluster to the original dataframe
+# add each player's cluster to the original dataframe and the imputed dataframe
 df$cluster <- as.factor(clusters$cluster)
-df <-df[c(1, 2, 3, 48, 4:47)]
+imputed_df$cluster <- as.factor(clusters$cluster)
+df <- df[c(1, 2, 44, 3:43)]
+imputed_df <- imputed_df[c(1, 2, 44, 3:43)]
 ```
 
 ``` {r}
-# creating a seperate dataframe for each of the three clusters
+# create seperate dataframes for each of the three clusters for both the original data and the imputed data
 cluster1 <- subset(df, cluster == "1")
 cluster2 <- subset(df, cluster == "2")
 cluster3 <- subset(df, cluster == "3")
+cluster1_imputed <- subset(imputed_df, cluster == "1")
+cluster2_imputed <- subset(imputed_df, cluster == "2")
+cluster3_imputed <- subset(imputed_df, cluster == "3")
 
-# calculating the means of each numeric column in each cluster
-cluster1_avgs <- colMeans(cluster1[sapply(cluster1, is.numeric)])
-cluster2_avgs <- colMeans(cluster2[sapply(cluster2, is.numeric)]) 
-cluster3_avgs <- colMeans(cluster3[sapply(cluster3, is.numeric)])
+# calculating each cluster's means for each attribute
+cluster1_avgs <- colMeans(cluster1_imputed[sapply(cluster1_imputed, is.numeric)])
+cluster2_avgs <- colMeans(cluster2_imputed[sapply(cluster2_imputed, is.numeric)]) 
+cluster3_avgs <- colMeans(cluster3_imputed[sapply(cluster3_imputed, is.numeric)])
 
-# create a new dataframe of the averages
+# create a new dataframe of the per-cluster averages
 cluster_avgs <- data.frame(cluster1_avgs, cluster2_avgs, cluster3_avgs)
 ```

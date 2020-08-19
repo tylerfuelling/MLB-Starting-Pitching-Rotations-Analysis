@@ -151,3 +151,28 @@ cluster_avgs <- data.frame(cluster1_avgs, cluster2_avgs, cluster3_avgs)
 # create a new dataframe of the per-cluster medians
 cluster_meds <- data.frame(cluster1_meds, cluster2_meds, cluster3_meds)
 ```
+
+``` {r}
+# read the pitcher success data file into a dataframe
+sp_success <- read.csv("sp_success_data 2010-2019.csv", header = TRUE, check.names = TRUE)
+colnames(sp_success)[1] <- "name"
+sp_success <- sp_success %>% rename(team = Team, era = ERA, siera = SIERA, whip = WHIP, fip = FIP, xfip = xFIP, war = WAR, rar = RAR)
+sp_success$cluster <- as.factor(clusters$cluster)
+sp_success <- sp_success[c(1, 2, 11, 3:10)]
+head(sp_success)
+```
+
+``` {r}
+# create seperate dataframes for each of the three clusters for the pitcher success data
+cluster1_success <- subset(sp_success, cluster == "1")
+cluster2_success <- subset(sp_success, cluster == "2")
+cluster3_success <- subset(sp_success, cluster == "3")
+
+# calculating each cluster's means for each attribute
+cluster1_success_avgs <- colMeans(cluster1_success[sapply(cluster1_success, is.numeric)])
+cluster2_success_avgs <- colMeans(cluster2_success[sapply(cluster2_success, is.numeric)]) 
+cluster3_success_avgs <- colMeans(cluster3_success[sapply(cluster3_success, is.numeric)])
+
+# create a new dataframe of the per-cluster averages
+cluster_success_avgs <- data.frame(cluster1_success_avgs, cluster2_success_avgs, cluster3_success_avgs)
+```

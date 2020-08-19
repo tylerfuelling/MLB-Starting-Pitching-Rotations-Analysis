@@ -156,7 +156,7 @@ cluster_meds <- data.frame(cluster1_meds, cluster2_meds, cluster3_meds)
 # read the pitcher success data file into a dataframe
 sp_success <- read.csv("sp_success_data 2010-2019.csv", header = TRUE, check.names = TRUE)
 colnames(sp_success)[1] <- "name"
-sp_success <- sp_success %>% rename(team = Team, era = ERA, siera = SIERA, whip = WHIP, fip = FIP, xfip = xFIP, war = WAR, rar = RAR)
+sp_success <- sp_success %>% rename(team = Team, era = ERA, siera = SIERA, whip = WHIP, fip = FIP, xfip = xFIP, war = WAR, rar = RAR, wpa = WPA)
 sp_success$cluster <- as.factor(clusters$cluster)
 sp_success <- sp_success[c(1, 2, 11, 3:10)]
 head(sp_success)

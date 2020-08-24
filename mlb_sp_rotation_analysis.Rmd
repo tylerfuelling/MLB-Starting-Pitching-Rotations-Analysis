@@ -1,0 +1,169 @@
+---
+title: "mlb_sp_rotation_analysis"
+author: "Tyler Fuelling"
+date: "August 23, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE, fig.height=50, fig.width=50}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load libraries
+library(tidyverse)
+library(readxl)
+library(VIM)
+library(dplyr)
+```
+
+
+``` {r}
+# read the mlb starting pitcher rotations data file into a dataframe
+df <- read_excel("sp_rotations 2010-2019.xlsx")
+# examine the dataframe
+dim(df)
+```
+``` {r}
+# removing the season and franchise columns from the dataframe
+df <- subset(df, select = -c(Season, Franchise))
+# renaming the columns of the the df for easier use
+df <- df %>% rename(team = Team, wins = Wins, losses = Losses, era = ERA, siera = SIERA, whip = WHIP, fip = FIP, xfip = xFIP,
+                    war = WAR, rar = RAR, wpa = WPA, sp1_cluster = `SP1 Cluster`, sp2_cluster = `SP2 Cluster`, sp3_cluster = `SP3 Cluster`,
+                    sp4_cluster = `SP4 Cluster`, sp5_cluster = `SP5 Cluster`, cluster1_sps = `Cluster 1 Pitchers`,
+                    cluster2_sps = `Cluster 2 Pitchers`, cluster3_sps =`Cluster 3 Pitchers`, rotation_composition = `Rotation Composition` )
+```
+
+``` {r}
+# examine the dataframe again
+head(df)
+```
+
+``` {r}
+# examining the NA values present in the dataframe
+aggr(df, col=c('navyblue', 'yellow'), numbers = TRUE, sortVars = TRUE, labels = names(df), cex.axis = .7, gap = 3, ylab = c("Missing Data", "Pattern"))
+```
+
+``` {r}
+# remove all of the rows in the dataframe containing NA values
+df <- na.omit(df)
+table(is.na(df))
+# now the dataframe consists solely of teams with a complete rotation from the group of clusteres pitchers
+dim(df)
+```
+``` {r}
+head(df)
+```
+
+``` {r fig.height=5, fig.width=8}
+# creating a graphic to measure the team success of all teams from the last ten seasons, while examining different compositions of starting pitcher rotations
+ggplot(data = df) +
+  geom_point(mapping = aes(x = wins, y = losses, color = rotation_composition), position = "jitter") +
+  labs(title = "Regular Season Team Success Examined by Starting Pitcher Rotation Composition (2010-19)",
+       x = "Wins",
+       y = "Losses",
+       caption = "Data from fangraphs.com and baseball-reference.com")
+```
+``` {r}
+# removing rotation compositions from the dataframe that occurred less than 5 times in the past ten years
+df <- df %>%
+  group_by(rotation_composition) %>%
+  filter(n() >= 5)
+```
+
+
+
+``` {r fig.height=5, fig.width=15}
+# creating a graphic to measure the team success of all teams from the last ten seasons, while examining different compositions of starting pitcher rotations
+ggplot(data = df, mapping = aes(x = rotation_composition, y = wins, color = rotation_composition)) +
+  geom_violin(scale = "area") +
+  labs(title = "Regular Season Team Success (2010-19)",
+       x = "Rotation Composition",
+       y = "Wins",
+       caption = "Data from fangraphs.com and baseball-reference.com") +
+  geom_jitter(position = position_jitter(0.1))
+```
+``` {r fig.height=5, fig.width=15}
+# creating a graphic to measure the team success of all teams from the last ten seasons, while examining different compositions of starting pitcher rotations
+ggplot(data = df, mapping = aes(x = rotation_composition, y = wins, color = rotation_composition)) +
+  geom_violin(scale = "area") +
+  labs(title = "Regular Season Team Success (2010-19)",
+       x = "Rotation Composition",
+       y = "Wins",
+       caption = "Data from fangraphs.com and baseball-reference.com") +
+  geom_boxplot(width = 0.15) +
+  stat_summary(fun = mean, geom = "point", color = "red")
+```
+
+
+``` {r}
+rotations_summary <- df %>%
+  group_by(rotation_composition) %>%
+  summarise(num_observations = n(),
+            avg_wins = mean(wins),
+            median_wins = median(wins),
+            avg_siera = mean(siera),
+            avg_xfip = mean(xfip),
+            .groups = "keep")
+
+rotations_summary
+```
+``` {r fig.height=8, fig.width=10}
+# creating a graphic to measure the team success of all teams from the last ten seasons, while examining different compositions of starting pitcher rotations
+ggplot(data = rotations_summary) +
+  geom_point(mapping = aes(x = avg_wins, y = median_wins, color = rotation_composition, size = num_observations), position = "jitter") +
+  labs(title = "Regular Season Team Success (2010-19)",
+       color = "Rotation Composition",
+       x = "Average Wins",
+       y = "Median Wins",
+       caption = "Data from fangraphs.com and baseball-reference.com") +
+  geom_text(aes(x = avg_wins, y = median_wins, label = rotation_composition, size = 10), nudge_y = 0.01)
+```
+
+``` {r fig.height=8, fig.width=10}
+# creating a graphic to measure the success of starting pitching rotations from the last ten seasons, while examining the different compositions of the rotations
+ggplot(data = rotations_summary) +
+  geom_point(mapping = aes(x = avg_xfip, y = avg_siera, color = rotation_composition, size = num_observations), position = "jitter") +
+  labs(title = "Regular Season Starting Pitching Rotation Success (2010-19)",
+       color = "Rotation Composition",
+       x = "Expected Fielding Independent Pitching (xFIP) for Starting Pitchers",
+       y = "Skill-Interactive Earned Run Average (SIERA) for Starting Pitchers",
+       caption = "Data from fangraphs.com and baseball-reference.com") +
+  geom_text(aes(x = avg_xfip, y = avg_siera, label = rotation_composition, size = 10), nudge_y = 0.01)
+```
+
+``` {r}
+# sort the df by wins
+df_sorted_by_wins <- df[order(-df$wins),]
+# take the top 20 rows of the df (top ~7.5% of the teams in the past 10 years)
+top_teams_by_wins <- df_sorted_by_wins[1:20,]
+```
+
+```{r}
+# graphing the different rotation compositions in the 20 most successful teams
+winningest_teams_by_rotation_composition <- top_teams_by_wins %>%
+  group_by(rotation_composition) %>%
+  summarise(num_observations = n(),
+            .groups = "keep")
+winningest_teams_by_rotation_composition
+
+ggplot(data = winningest_teams_by_rotation_composition) +
+  geom_bar(mapping = aes(x = rotation_composition, y = num_observations), stat = "identity")
+```
+
+``` {r}
+# sort the df by SP xFIP
+df_sorted_by_xfip <- df[order(df$xfip),]
+# take the top 20 rows of the df (top ~7.5% of the teams in the past 10 years in sp xFIP)
+top_teams_by_xfip <- df_sorted_by_xfip[1:20,]
+```
+
+```{r}
+# graphing the different rotation compositions in the 20 most successful teams by SP xFIP
+lowest_xfip_teams_by_rotation_composition <- top_teams_by_xfip %>%
+  group_by(rotation_composition) %>%
+  summarise(num_observations = n(),
+            .groups = "keep")
+lowest_xfip_teams_by_rotation_composition
+
+ggplot(data = lowest_xfip_teams_by_rotation_composition) +
+  geom_bar(mapping = aes(x = rotation_composition, y = num_observations), stat = "identity")
+```

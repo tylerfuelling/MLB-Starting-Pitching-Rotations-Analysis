@@ -1,4 +1,4 @@
-# MLB Starting Pitchers Analysis
+# MLB Starting Pitchers and Starting Rotations Analysis
 Analysis of MLB starting pitchers and MLB teams' starting pitching rotations from the 2010 season through the 2019 season (min. 100 innings pitched over this time period for a 
 pitcher to be included).
 

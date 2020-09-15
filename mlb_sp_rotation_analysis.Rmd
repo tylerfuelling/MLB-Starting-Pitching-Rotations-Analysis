@@ -2,7 +2,10 @@
 title: "MLB Starting Pitching Rotations Analysis"
 author: "Tyler Fuelling"
 date: "August 23, 2020"
-output: html_document
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
 ---
 Now that k-means clustering has been performed on the dataset of MLB starting pitchers from 2010 through 2019, the next step is to examine the compositions of MLB starting pitching
 rotations during that timeframe.

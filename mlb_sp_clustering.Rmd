@@ -1,9 +1,12 @@
 ---
-title: "mlb_sp_clustering"
+title: "MLB Starting Pitcher Clustering"
 author: "Tyler Fuelling"
 date: "August 16, 2020"
 output: html_document
 ---
+The goal of this project was to analyze starting pitchers in the MLB at first by their pitching style rather than their level of success. Then, to examine different compositions of
+MLB starting pitching rotations based on the different pitching styles of the pitchers that make them up, and to see which rotation compostions have lead to the most success. The
+examination of different starting pitching styles will be accomplished through k-means clustering.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -21,6 +24,10 @@ library(miscTools)
 library(tidyverse)
 ```
 
+We begin by loading the data into a dataframe. The dataset contains data for all MLB starting picthers who have pitched at least 100 total innings during the 2010 through 2019
+seasons. Because the k-means clustering will be done based on pitching style rather than the pitcher's level of success, the dataset contains metrics such as fastball
+percentage, pitch velocities, standardized runs by pitch type, expected velocity, first-strike percentage, strikeout percentage, walk percentage, and swinging strike percentage, 
+rather than conventional pitching success metrics, such as ERA or WHIP. Data obtained from https://www.fangraphs.com/.
 ```{r}
 # read the data file into a dataframe
 df <- read.csv("sp_data 2010-2019.csv", header = TRUE, check.names = TRUE)
@@ -29,20 +36,32 @@ head(df)
 ``` {r}
 # renaming the columns of the the df for easier use
 colnames(df)[1] <- "name"
-df <- df %>% rename(team = Team, ip = IP, k_percent = K., bb_percent = BB., babip = BABIP, gb_percent = GB., ld_percent = LD., fb_percent = FB.,iffb_percent = IFFB.,
-                    ev = EV, soft_percent = Soft., med_percent = Med., hard_percent = Hard., fa_percent = FB..1, sl_percent = SL., ct_percent = CT., cb_percent = CB.,
-                    ch_percent = CH., sf_percent = SF., kn_percent = KN., fa_standardized_runs = wFB.C, sl_standardized_runs = wSL.C, ct_standardized_runs = wCT.C,
-                    cb_standardized_runs = wCB.C, ch_standardized_runs = wCH.C, sf_standardized_runs = wSF.C, kn_standardized_runs = wKN.C, fa_velo = FBv, sl_velo = SLv,
-                    ct_velo = CTv, cb_velo = CBv, ch_velo = CHv, sf_velo = SFv, kn_velo = KNv, o_swing_percent = O.Swing., z_swing_percent = Z.Swing., swing_percent = Swing.,
-                    o_contact_percent = O.Contact., z_contact_percent = Z.Contact., contact_percent = Contact., zone_percent = Zone., first_strike_percent = F.Strike.,
-                    swinging_strike_percent = SwStr., lob_percent = LOB., pace = Pace, player_id = playerid)
+df <- df %>% rename(team = Team, ip = IP, k_percent = K., bb_percent = BB., babip = BABIP, gb_percent = GB.,
+                    ld_percent = LD., fb_percent = FB.,iffb_percent = IFFB., ev = EV, soft_percent = Soft.,
+                    med_percent = Med., hard_percent = Hard., fa_percent = FB..1, sl_percent = SL.,
+                    ct_percent = CT., cb_percent = CB., ch_percent = CH., sf_percent = SF., kn_percent = KN.,
+                    fa_standardized_runs = wFB.C, sl_standardized_runs = wSL.C, ct_standardized_runs = wCT.C,
+                    cb_standardized_runs = wCB.C, ch_standardized_runs = wCH.C, sf_standardized_runs = wSF.C,
+                    kn_standardized_runs = wKN.C, fa_velo = FBv, sl_velo = SLv, ct_velo = CTv, cb_velo = CBv,
+                    ch_velo = CHv, sf_velo = SFv, kn_velo = KNv, o_swing_percent = O.Swing.,
+                    z_swing_percent = Z.Swing., swing_percent = Swing., o_contact_percent = O.Contact.,
+                    z_contact_percent = Z.Contact., contact_percent = Contact., zone_percent = Zone.,
+                    first_strike_percent = F.Strike., swinging_strike_percent = SwStr., lob_percent = LOB.,
+                    pace = Pace, player_id = playerid)
 ```
 
-``` {r}
+Because starting pitchers do not all throw the same types of pitches, there are many NA values present in the dataset where data is missing. For example, a pitcher who does not
+throw a slider will have NA values for slider percentage and slider velocity.
+``` {r message =FALSE}
 # examining the NA values present in the dataframe
-aggr(df, col=c('navyblue', 'yellow'), numbers = TRUE, sortVars = TRUE, labels = names(df), cex.axis = .7, gap = 3, ylab = c("Missing Data", "Pattern"))
+aggr(df, col=c('navyblue', 'yellow'), numbers = TRUE, sortVars = TRUE, labels = names(df), cex.axis = .7,
+     gap = 3, ylab = c("Missing Data", "Pattern"))
 ```
-``` {r}
+Because there are so many missing elements in the dataset, all of these NA values must be addressed in some fashion. So, multivariate imputation will be utiilized to address
+this issue. Imputation is a method used to fill in the missing values of a dataset with values that are estimated using the rest of the values in the dataset. In this project, a
+specific type of imputation, multivariate imputation via chained equations, will be implemented using the MICE package in R. This process is further explained here:
+https://medium.com/coinmonks/dealing-with-missing-data-using-r-3ae428da2d17. 
+``` {r message=FALSE, results="hide"}
 # removing the player id column - we don't need it
 df <- subset(df, select = -c(player_id))
 # creating a new subset of the dataframe without the name and team columns to be used for multivariate imputation (MICE package)
@@ -61,6 +80,8 @@ mice_subset <- mice_subset[colSums(is.na(mice_subset)) == 0]
 table(is.na(mice_subset))
 ```
 
+After performing the multivariate imputation with the MICE package, the datset is organized and then standardized to a mean of 0 and a standard deviation of 1 in order to
+facilitate it being used for k-means clustering.
 ```{r}
 # make a copy of the dataframe that contains all of the numerical data, including all of the imputed data
 imputed_df <- data.frame(mice_subset)
@@ -69,16 +90,21 @@ imputed_df$name <- df$name
 imputed_df$team <- df$team
 
 # reorganizing the order of the columns of the dataframe
-imputed_df <- imputed_df[c(42, 43, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 22, 23, 24, 25, 26, 12, 27, 28, 29, 30, 31, 13, 32, 33, 34, 35, 36,
-                           21, 37, 38, 39, 40, 41)]
+imputed_df <- imputed_df[c(42, 43, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 22, 23, 24,
+                           25, 26, 12, 27, 28, 29, 30, 31, 13, 32, 33, 34, 35, 36, 21, 37, 38, 39, 40, 41)]
 
 # standardizing the data so that it can be used for k-means clustering
 standardized_imputed_df <- data.frame(imputed_df)
 standardized_imputed_df[c(3:43)] <- scale(standardized_imputed_df[c(3:43)])
-head(standardized_imputed_df)
 ```
 
-``` {r}
+k-means clustering is a method/algorithm that partitions n observations into k different clusters in which each observation belongs to the cluster with the nearest mean. However,
+when using the k-means clustering algorithm, the user must specify k. There are two main methods for determining the optimal k: the elbow method and silhouette analysis, both of 
+which are used in this project. The Elbow Method involves graphing the total within-cluster sum of squares for the result of k-means clustering with k clusters as a function of
+k, and then selecting the k at which the graph forms an "elbow". Silhouette analysis involves measuring the average distance between clusters when k-means clustering is performed
+with k clusters (the farther away the clusters are from each other, the better). More explanation of these methods can be found here: 
+https://towardsdatascience.com/k-means-clustering-algorithm-applications-evaluation-methods-and-drawbacks-aa03e644b48a.
+``` {r message=FALSE}
 # determining the optimal number of clusters to use for k-means clustering
 
 set.seed(123) # set the seed so that the clustering achieves the same result each time it is run
@@ -115,6 +141,7 @@ plot(possible_k_values, avg_silhouette_values, type = "b", frame = FALSE, xlab= 
 
 ```
 
+After choosing 3 as the best possible value of k, k-means clustering is performed on the dataset of starting pitchers. 
 ``` {r}
 # based on the Elbow Method and Silhouette Analysis, we will make an educated guess of 3 as our value of k for k-means clustering
 set.seed(123) # set seed
@@ -129,6 +156,10 @@ df <- df[c(1, 2, 47, 3:46)]
 imputed_df <- imputed_df[c(1, 2, 44, 3:43)]
 ```
 
+In order to analyze the three clusters, cluster-wide means and medians are calculated for each feature. When examining the clusters, we can give descriptive names to each of the 
+clusters based on their cluster-wide means and medians. Based on these pitchers' high velocities on all of their pitchers and high number of standardized runs saved with the 
+fastball, we will call pitchers in Cluster 1 "power" pitchers. Based on these pitchers' low walk percentages and high first-strike percentages, we will call pitchers in Cluster 2 
+"control" pitchers. Lastly, based on their lack of identifying characteristics and the lack of features that they excel at, we will call pitchers in Cluster 3 "standard" pitchers.
 ``` {r}
 # create seperate dataframes for each of the three clusters for both the original data and the imputed data
 cluster1 <- subset(df, cluster == "1")
@@ -151,18 +182,25 @@ cluster3_meds <- colMedians(cluster3_imputed[sapply(cluster3_imputed, is.numeric
 cluster_avgs <- data.frame(cluster1_avgs, cluster2_avgs, cluster3_avgs)
 # create a new dataframe of the per-cluster medians
 cluster_meds <- data.frame(cluster1_meds, cluster2_meds, cluster3_meds)
+
+cluster_avgs
+cluster_meds
 ```
 
+After k-means clustering has been performed on the starting pitchers dataset containing only the pitching style metrics, pitching success metrics; like ERA, FIP, and WHIP; for the
+same set of starting pitchers over the same timeframe will be read into a new dataframe, which will also identify each starting pitcher's cluster.
 ``` {r}
 # read the pitcher success data file into a dataframe
 sp_success <- read.csv("sp_success_data 2010-2019.csv", header = TRUE, check.names = TRUE)
 colnames(sp_success)[1] <- "name"
-sp_success <- sp_success %>% rename(team = Team, era = ERA, siera = SIERA, whip = WHIP, fip = FIP, xfip = xFIP, war = WAR, rar = RAR, wpa = WPA)
+sp_success <- sp_success %>% rename(team = Team, era = ERA, siera = SIERA, whip = WHIP, fip = FIP, xfip = xFIP,
+                                    war = WAR, rar = RAR, wpa = WPA)
 sp_success$cluster <- as.factor(clusters$cluster)
 sp_success <- sp_success[c(1, 2, 11, 3:10)]
 head(sp_success)
 ```
 
+In order to analyze the three clusters based on pitching success, cluster-wide means and medians are calculated for each feature.
 ``` {r}
 # create seperate dataframes for each of the three clusters for the pitcher success data
 cluster1_success <- subset(sp_success, cluster == "1")
@@ -178,6 +216,9 @@ cluster3_success_avgs <- colMeans(cluster3_success[sapply(cluster3_success, is.n
 cluster_success_avgs <- data.frame(cluster1_success_avgs, cluster2_success_avgs, cluster3_success_avgs)
 ```
 
+Two of the best metrics to quantify a pitcher's performance are Skill-Interactive Earned Run Average (SIERA) and Expected Fielding Independent Pitching (xFIP) because they attempt
+to eliminate factors the pitcher can't control himself, such as the defense in xFIP and the type of ball in play for SIERA. More information on each of these metrics can be found 
+here: xFIP - https://library.fangraphs.com/pitching/xfip/, SIERA - https://library.fangraphs.com/pitching/siera/.
 ``` {r}
 # creating a graphic to measure the success of each of the three clusters
 ggplot(data = sp_success) +
@@ -201,3 +242,6 @@ ggplot(data = sp_success) +
        color = "Cluster",
        caption = "Data from fangraphs.com")
 ```
+
+Based on these graphics attempting to quantify a pitcher's success through SIERA and xFIP, it can be seen that as a general rule, pitchers in Cluster 1 ("power" pitchers) are the 
+most successful, followed by Cluster 2 ("control" pitchers), and then Cluster 3 ("standard" pitchers).

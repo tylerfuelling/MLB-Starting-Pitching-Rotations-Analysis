@@ -1,10 +1,11 @@
 ---
-title: "mlb_sp_rotation_analysis"
+title: "MLB Starting Pitching Rotations Analysis"
 author: "Tyler Fuelling"
 date: "August 23, 2020"
 output: html_document
 ---
-
+Now that k-means clustering has been performed on the dataset of MLB starting pitchers from 2010 through 2019, the next step is to examine the compositions of MLB starting pitching
+rotations during that timeframe.
 ```{r setup, include=FALSE, fig.height=50, fig.width=50}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -15,31 +16,45 @@ library(VIM)
 library(dplyr)
 ```
 
-
+We begin by loading the data into a dataframe. The dataset contains data for all 300 MLB teams from the 2010 through 2019 seasons, and was created with data from 
+https://www.fangraphs.com/ and https://www.baseball-reference.com/.
 ``` {r}
 # read the mlb starting pitcher rotations data file into a dataframe
 df <- read_excel("sp_rotations 2010-2019.xlsx")
-# examine the dataframe
+# examine the dataframe's dimensions
 dim(df)
 ```
+The features of this dataset contain team success data; such as wins, losses, starting pitching SIERA, and starting pitching xFIP; as well as rotation composition data. The columns
+titled "spx_cluster" represent the cluster number of the starting pitcher who threw the "xth" most innings for that team that year. If one of these datapoints is NA, it means
+that that pitcher did not throw at least 100 innings from 2010-2019, and thus did not qualify to be in the original dataset. The columns titled "clusterx_sps" represents the
+number of pitchers from cluster x in that team's five-man starting pitching rotation. Lastly, the column titled "rotation_composition" contains an encoding of the team's starting
+pitching rotation. The first digit is the number of pitchers belonging to Cluster 1 that are a part of the team's five-man starting pitching rotation, the second digit is the 
+number of pitchers belonging to Cluster 2 that are a part of the team's five-man starting pitching rotation, and the third digit is the number of pitchers belonging to Cluster 3 
+that are a part of the team's five-man starting pitching rotation. For example, a rotation composition of "221" means that that team has a starting pitching rotation consisting
+of 2 pitchers from Cluster 1, 2 pitchers from Cluster 2, and 1 pitcher from Cluster 3.
 ``` {r}
 # removing the season and franchise columns from the dataframe
 df <- subset(df, select = -c(Season, Franchise))
 # renaming the columns of the the df for easier use
-df <- df %>% rename(team = Team, wins = Wins, losses = Losses, era = ERA, siera = SIERA, whip = WHIP, fip = FIP, xfip = xFIP,
-                    war = WAR, rar = RAR, wpa = WPA, sp1_cluster = `SP1 Cluster`, sp2_cluster = `SP2 Cluster`, sp3_cluster = `SP3 Cluster`,
-                    sp4_cluster = `SP4 Cluster`, sp5_cluster = `SP5 Cluster`, cluster1_sps = `Cluster 1 Pitchers`,
-                    cluster2_sps = `Cluster 2 Pitchers`, cluster3_sps =`Cluster 3 Pitchers`, rotation_composition = `Rotation Composition` )
+df <- df %>% rename(team = Team, wins = Wins, losses = Losses, era = ERA, siera = SIERA, whip = WHIP, 
+                    fip = FIP, xfip = xFIP, war = WAR, rar = RAR, wpa = WPA, sp1_cluster = `SP1 Cluster`,
+                    sp2_cluster = `SP2 Cluster`, sp3_cluster = `SP3 Cluster`, sp4_cluster = `SP4 Cluster`,
+                    sp5_cluster = `SP5 Cluster`, cluster1_sps = `Cluster 1 Pitchers`, 
+                    cluster2_sps = `Cluster 2 Pitchers`, cluster3_sps =`Cluster 3 Pitchers`,
+                    rotation_composition = `Rotation Composition` )
 ```
 
 ``` {r}
-# examine the dataframe again
+# examine the dataframe
 head(df)
 ```
-
+Because some teams have a member of their starting pitching rotation who does not meet the minimum qualifications of having pitched at least 100 innings during the seasons from
+2010 through 2019, there are many NA values present in the dataset. In this case, the missing data will be handled by removing all of the rows that contain an NA value from the
+datset. This removes 32 teams from the dataset, leaving 268 teams in the rotation composition dataset.
 ``` {r}
 # examining the NA values present in the dataframe
-aggr(df, col=c('navyblue', 'yellow'), numbers = TRUE, sortVars = TRUE, labels = names(df), cex.axis = .7, gap = 3, ylab = c("Missing Data", "Pattern"))
+aggr(df, col=c('navyblue', 'yellow'), numbers = TRUE, sortVars = TRUE, labels = names(df), cex.axis = .7,
+     gap = 3, ylab = c("Missing Data", "Pattern"))
 ```
 
 ``` {r}
@@ -49,19 +64,10 @@ table(is.na(df))
 # now the dataframe consists solely of teams with a complete rotation from the group of clusteres pitchers
 dim(df)
 ```
-``` {r}
-head(df)
-```
-
-``` {r fig.height=5, fig.width=8}
-# creating a graphic to measure the team success of all teams from the last ten seasons, while examining different compositions of starting pitcher rotations
-ggplot(data = df) +
-  geom_point(mapping = aes(x = wins, y = losses, color = rotation_composition), position = "jitter") +
-  labs(title = "Regular Season Team Success Examined by Starting Pitcher Rotation Composition (2010-19)",
-       x = "Wins",
-       y = "Losses",
-       caption = "Data from fangraphs.com and baseball-reference.com")
-```
+Because there were such few occurrences of these rotation compositions throughout the past ten seasons, all of the rotation compositions that occurred less than five times
+throughout that timeframe were removed from the dataset. Because there are 21 possible rotation compositions, each rotation could be expected to occur about 8 percent of the time.
+Those occurring less than five times occurred less than 2 percent of the time, which was determined to be too small of a sample size to draw any conclusions about those specific
+rotation compositions.
 ``` {r}
 # removing rotation compositions from the dataframe that occurred less than 5 times in the past ten years
 df <- df %>%
@@ -69,7 +75,8 @@ df <- df %>%
   filter(n() >= 5)
 ```
 
-
+Team success by starting pitching rotation composition can be conveyed through violin plots. For the violin plot using data points, each data point inside the violins represents
+one team which had the rotation composition indicated by the point's color.
 
 ``` {r fig.height=5, fig.width=15}
 # creating a graphic to measure the team success of all teams from the last ten seasons, while examining different compositions of starting pitcher rotations
@@ -81,6 +88,9 @@ ggplot(data = df, mapping = aes(x = rotation_composition, y = wins, color = rota
        caption = "Data from fangraphs.com and baseball-reference.com") +
   geom_jitter(position = position_jitter(0.1))
 ```
+For the violin plot using boxplots, the boxplot inside of each violin represents the minimum, first quartile, median, third quartile, and maximum of wins for teams that had
+the rotation composition indicated by the color of the violin. The red dot represents the mean number of wins for teams that had the rotation composition indicated by the color of 
+the violin.
 ``` {r fig.height=5, fig.width=15}
 # creating a graphic to measure the team success of all teams from the last ten seasons, while examining different compositions of starting pitcher rotations
 ggplot(data = df, mapping = aes(x = rotation_composition, y = wins, color = rotation_composition)) +
@@ -92,7 +102,9 @@ ggplot(data = df, mapping = aes(x = rotation_composition, y = wins, color = rota
   geom_boxplot(width = 0.15) +
   stat_summary(fun = mean, geom = "point", color = "red")
 ```
-
+After examining the violin plots, it can clearly be seen that the most successful teams over the last ten seasons have had rotation compositions of 311, 320, 410, and 500. Now, 
+instead of examining only team-wide success, the success of the starting pitching rotation independent of the rest of the team will be examined as well. In the same way that the
+success of each cluster was measured using SIERA and xFIP, the average success of each rotation composition will be measured using SIERA and xFIP as well.
 
 ``` {r}
 rotations_summary <- df %>%
@@ -106,6 +118,10 @@ rotations_summary <- df %>%
 
 rotations_summary
 ```
+In addition to the violin plots, team successs by rotation composition can be conveyed through a scatterplot featuring average wins for teams with that rotation composition
+and median wins for teams with that rotation composition as variables. The rotation composition is indicated by the color of the points and the number of observations is
+indicated by the size of the points. For this scatterplot the points closest to the top-right corner of the scatterplot are the most successful, which are rotation compositions
+320 and 500.
 ``` {r fig.height=8, fig.width=10}
 # creating a graphic to measure the team success of all teams from the last ten seasons, while examining different compositions of starting pitcher rotations
 ggplot(data = rotations_summary) +
@@ -117,7 +133,9 @@ ggplot(data = rotations_summary) +
        caption = "Data from fangraphs.com and baseball-reference.com") +
   geom_text(aes(x = avg_wins, y = median_wins, label = rotation_composition, size = 10), nudge_y = 0.01)
 ```
-
+In addition to measuring overall team success, the succcess of the starting rotation independent of the rest of the team can be conveyed through a scatterplot featuring average 
+SIERA for teams with that rotation composition and average xFIP for teams with that rotation composition as variables. The rotation composition is indicated by the color of the 
+points and the number of observations is indicated by the size of the points. For this scatterplot the points closest to the bottom-left corner of the scatterplot are the most successful, which is rotation composition 500.
 ``` {r fig.height=8, fig.width=10}
 # creating a graphic to measure the success of starting pitching rotations from the last ten seasons, while examining the different compositions of the rotations
 ggplot(data = rotations_summary) +
@@ -129,7 +147,10 @@ ggplot(data = rotations_summary) +
        caption = "Data from fangraphs.com and baseball-reference.com") +
   geom_text(aes(x = avg_xfip, y = avg_siera, label = rotation_composition, size = 10), nudge_y = 0.01)
 ```
-
+Based on analysis to this point, it seems that on average, the starting pitching rotation composition of 500 is the most successful. Now, instead of looking at average success
+levels, each rotation composition's proclivity towards the highest levels of success will be examined. In order to do so, the 20 winningest teams from the past ten seasons are
+graphed by their rotation composition. It can be seen that 25% of these teams have a rotation composition of 410, which is the highest percentage of any of the rotation
+compositions.
 ``` {r}
 # sort the df by wins
 df_sorted_by_wins <- df[order(-df$wins),]
@@ -146,9 +167,15 @@ winningest_teams_by_rotation_composition <- top_teams_by_wins %>%
 winningest_teams_by_rotation_composition
 
 ggplot(data = winningest_teams_by_rotation_composition) +
-  geom_bar(mapping = aes(x = rotation_composition, y = num_observations), stat = "identity")
+  geom_bar(mapping = aes(x = rotation_composition, y = num_observations), stat = "identity") +
+  labs(title = "20 Winningest Teams from 2010-2019 MLB Seasons",
+       x = "Rotation Composition",
+       y = "Number of Teams",
+       caption = "Data from fangraphs.com and baseball-reference.com")
 ```
 
+Next, in order to to examine each rotation composition's proclivity to the highest levels of starting pitching rotation success independent of the rest of the team, the 20 teams 
+with the best starting pitching xFIP the from the past ten seasons are graphed by their rotation composition. It can be seen that 25% of these teams have a rotation composition of 410, which is the highest percentage of any of the rotation compositions.
 ``` {r}
 # sort the df by SP xFIP
 df_sorted_by_xfip <- df[order(df$xfip),]
@@ -165,5 +192,17 @@ lowest_xfip_teams_by_rotation_composition <- top_teams_by_xfip %>%
 lowest_xfip_teams_by_rotation_composition
 
 ggplot(data = lowest_xfip_teams_by_rotation_composition) +
-  geom_bar(mapping = aes(x = rotation_composition, y = num_observations), stat = "identity")
+  geom_bar(mapping = aes(x = rotation_composition, y = num_observations), stat = "identity") +
+  labs(title = "20 Best Starting Rotations from 2010-2019 MLB Seasons Based on Starting Pitching xFIP",
+       x = "Rotation Composition",
+       y = "Number of Teams",
+       caption = "Data from fangraphs.com and baseball-reference.com")
 ```
+
+After analyzing the data, it can be seen that the rotation composition which consistently leads to both the highest average team success and highest average starting pitching
+rotation success independent of the rest of the team is 500, or 5 "power" pitchers. However, the rotation composition which allows for the possibility of the highest levels of team
+success and the highest levels of starting pitching rotation success independent of the rest of the team is 410, or 4 "power" pitchers and 1 "control" pitcher. Either way, both of 
+these rotation compositions contain at least 4 "power pitchers", showing that the "power pitcher" is extremely valuable in MLB starting pitching rotations. Nonetheless, the fact 
+that rotation composition 410 has lead teams to extremely high levels of success during the past ten seasons displays the fact that there is value in having a "control pitcher" as
+a member of the starting pitching rotation as well. However, it is clear from the data that the "power pitcher" is king in the MLB, at least when it comes to putting together a 
+team's starting rotation.

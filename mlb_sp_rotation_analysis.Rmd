@@ -3,9 +3,9 @@ title: "MLB Starting Pitching Rotations Analysis"
 author: "Tyler Fuelling"
 date: "August 23, 2020"
 output:
-  word_document: default
-  pdf_document: default
   html_document: default
+  pdf_document: default
+  word_document: default
 ---
 Now that k-means clustering has been performed on the dataset of MLB starting pitchers from 2010 through 2019, the next step is to examine the compositions of MLB starting pitching
 rotations during that timeframe.
@@ -23,7 +23,7 @@ We begin by loading the data into a dataframe. The dataset contains data for all
 https://www.fangraphs.com/ and https://www.baseball-reference.com/.
 ``` {r}
 # read the mlb starting pitcher rotations data file into a dataframe
-df <- read_excel("sp_rotations 2010-2019.xlsx")
+df <- read_excel("Datasets/sp_rotations 2010-2019.xlsx")
 # examine the dataframe's dimensions
 dim(df)
 ```
@@ -196,7 +196,7 @@ lowest_xfip_teams_by_rotation_composition
 
 ggplot(data = lowest_xfip_teams_by_rotation_composition) +
   geom_bar(mapping = aes(x = rotation_composition, y = num_observations), stat = "identity") +
-  labs(title = "20 Best Starting Rotations from 2010-2019 MLB Seasons Based on Starting Pitching xFIP",
+  labs(title = "20 Best Starting Rotations from 2010-2019 MLB Seasons Based on \nStarting Pitching xFIP",
        x = "Rotation Composition",
        y = "Number of Teams",
        caption = "Data from fangraphs.com and baseball-reference.com")
